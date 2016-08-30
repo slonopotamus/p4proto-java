@@ -2,9 +2,11 @@ package ru.bozaro.p4;
 
 import org.jetbrains.annotations.NotNull;
 import ru.bozaro.p4.proto.Client;
+import ru.bozaro.p4.proto.P4VFS;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -87,7 +89,18 @@ public final class P4Tester implements AutoCloseable {
             try {
                 Socket socket = new Socket(HOST, serverPort);
                 return new Client(socket, username, password, username, (prompt, noecho) -> "", (severity, message) -> {
-                }, false);
+                }, false, new P4VFS() {
+                    @NotNull
+                    @Override
+                    public InputStream openFile(@NotNull String path) throws IOException {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public @NotNull P4VFS.FileStatus getFileStatus(@NotNull String path) {
+                        throw new UnsupportedOperationException();
+                    }
+                });
             } catch (ConnectException e) {
                 if (System.currentTimeMillis() > timeout)
                     throw new IOException("Server connect timeout", e);

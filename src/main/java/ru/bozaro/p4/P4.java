@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import ru.bozaro.p4.proto.Client;
 import ru.bozaro.p4.proto.ErrorSeverity;
 import ru.bozaro.p4.proto.Message;
+import ru.bozaro.p4.proto.P4VFS;
 
 import javax.xml.ws.Holder;
 import java.io.*;
@@ -20,7 +21,7 @@ import java.util.List;
 /**
  * @author Marat Radchenko
  */
-public final class P4 {
+public final class P4 implements P4VFS {
 
     private P4() {
     }
@@ -46,13 +47,15 @@ public final class P4 {
         }
 
         try (Socket socket = new Socket(host, port)) {
+            final P4 p4 = new P4();
+
             final Client client = new Client(socket,
                     cmd.user,
                     cmd.password,
                     cmd.client,
                     P4::userInput,
                     P4::outputMessage,
-                    cmd.verboseRPC > 0);
+                    cmd.verboseRPC > 0, p4);
 
             final String func = cmd.command.get(0);
             final String[] funcArgs = cmd.command.subList(1, cmd.command.size()).toArray(new String[0]);
@@ -155,6 +158,19 @@ public final class P4 {
             default:
                 throw new UnsupportedOperationException(message.getFunc());
         }
+    }
+
+    @Override
+    public @NotNull P4VFS.FileStatus getFileStatus(@NotNull String path) {
+        if (!new File(path).exists())
+            return FileStatus.Missing;
+
+        return FileStatus.Exists;
+    }
+
+    @Override
+    public @NotNull InputStream openFile(@NotNull String path) throws IOException {
+        return new FileInputStream(path);
     }
 
     public static class CmdArgs {

@@ -6,6 +6,7 @@ import ru.bozaro.p4.crypto.Mangle;
 
 import javax.xml.ws.Holder;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StreamCorruptedException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -45,6 +46,8 @@ public final class Client implements AutoCloseable {
     private byte[] secretHash = null;
     @NotNull
     private final Map<String, byte[]> secretTokens = new HashMap<>();
+    @NotNull
+    private final P4VFS vfs;
 
     public Client(@NotNull Socket socket,
                   @NotNull String username,
@@ -53,13 +56,14 @@ public final class Client implements AutoCloseable {
                   @NotNull String client,
                   @NotNull InputResolver inputResolver,
                   @NotNull MessageOutput messageOutput,
-                  boolean verbose) {
+                  boolean verbose, @NotNull P4VFS vfs) {
         this.username = username;
         this.messageOutput = messageOutput;
         this.verbose = verbose;
         this.baseMessage = createBaseMessage(client);
         this.socket = socket;
         this.password = password;
+        this.vfs = vfs;
         this.funcs = new HashMap<>();
         this.inputResolver = inputResolver;
         funcs.put("flush1", this::flush1);
@@ -68,6 +72,41 @@ public final class Client implements AutoCloseable {
         funcs.put("client-Message", this::clientMessage);
         funcs.put("client-Prompt", this::clientPrompt);
         funcs.put("client-SetPassword", this::clientSetPassword);
+        funcs.put("client-CheckFile", this::clientCheckFile);
+        funcs.put("client-SendFile", this::clientSendFile);
+    }
+
+    private Message.Builder clientSendFile(@NotNull Message req, Holder<ErrorSeverity> severityHolder) throws IOException {
+        String path = req.getString("path");
+        if (path == null)
+            throw new StreamCorruptedException();
+
+        final byte[] confirm = req.getBytes("confirm");
+        final byte[] decline = req.getBytes("decline");
+        try (InputStream in = vfs.openFile(path)) {
+            return req.toBuilder()
+                    .param(Message.FUNC, confirm);
+        }
+    }
+
+    @Nullable
+    private Message.Builder clientCheckFile(@NotNull Message req, @NotNull Holder<ErrorSeverity> severityHolder) throws IOException {
+        final String path = req.getString("path");
+        if (path == null)
+            throw new StreamCorruptedException();
+
+        final byte[] confirm = req.getBytes("confirm");
+        final String clientType = req.getString("type");
+
+        if (clientType != null)
+            throw new UnsupportedOperationException("Not implemented");
+
+        final P4VFS.FileStatus fileStatus = vfs.getFileStatus(path);
+        return req.toBuilder()
+                .param("type", "text")
+                .param("status", fileStatus.toP4())
+                .param(Message.FUNC, confirm);
+
     }
 
     @Nullable
