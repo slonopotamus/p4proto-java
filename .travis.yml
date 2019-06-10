@@ -1,20 +1,31 @@
 language: java
-sudo: false
+
 env:
-- P4D_VERSION=15.1
-- P4D_VERSION=15.2
-- P4D_VERSION=16.1
+  - P4D_VERSION=19.1
+  - P4D_VERSION=18.2
+  - P4D_VERSION=17.2
+
 jdk:
-- oraclejdk8
+  - openjdk8
+
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
   - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
+  - rm -fr $HOME/.gradle/caches/*/scripts/
+  - rm -fr $HOME/.gradle/caches/*/scripts-remapped/
+  - rm -f  $HOME/.gradle/caches/*/fileContent/fileContent.lock
+  - rm -f  $HOME/.gradle/caches/*/fileHashes/fileHashes.bin
+  - rm -f  $HOME/.gradle/caches/*/fileHashes/fileHashes.lock
+  - rm -f  $HOME/.gradle/caches/*/javaCompile/javaCompile.lock
+  - rm -fr  $HOME/.gradle/caches/journal-*
+
 cache:
   directories:
-  - $HOME/.gradle/caches/
-  - $HOME/.gradle/wrapper/
+    - $HOME/.gradle/caches/
+    - $HOME/.gradle/wrapper/
+
 before_install:
-- mkdir -p build/r${P4D_VERSION}
-- wget http://cdist2.perforce.com/perforce/r${P4D_VERSION}/bin.linux26x86_64/p4d -O build/r${P4D_VERSION}/p4d
-- chmod +x build/r${P4D_VERSION}/p4d
-- export PATH=$PATH:`pwd`/build/r${P4D_VERSION}
+  - mkdir -p build/r${P4D_VERSION}
+  - wget http://cdist2.perforce.com/perforce/r${P4D_VERSION}/bin.linux26x86_64/p4d -O build/r${P4D_VERSION}/p4d
+  - chmod +x build/r${P4D_VERSION}/p4d
+  - export PATH=$PATH:`pwd`/build/r${P4D_VERSION}
