@@ -31,7 +31,7 @@ import java.util.Arrays;
  * the 32 character digest (data > 16 characters) alternative
  * interfaces InMD5() and OutMD5() handle the "raw" digest.
  */
-public class Mangle {
+public final class Mangle {
     private static final int BPB = 8;
     // diffusion pattern
     private static final int[] o = new int[]{7, 6, 2, 1, 5, 0, 3, 4};

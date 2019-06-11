@@ -38,7 +38,7 @@ public final class Client implements AutoCloseable {
     private boolean protocolSent = false;
     private int protocolServer = -1;
     @NotNull
-    private String password = "";
+    private String password;
     @Nullable
     private byte[] secretHash = null;
     @NotNull
@@ -191,11 +191,11 @@ public final class Client implements AutoCloseable {
         msg.send(socket.getOutputStream());
     }
 
-    private void show(@NotNull String prefix, @NotNull Message msg) throws IOException {
-        msg.show(System.out, prefix);
+    private void show(@NotNull String prefix, @NotNull Message msg) {
+        msg.show(System.err, prefix);
     }
 
-    @Nullable
+    @NotNull
     private Message.Builder flush1(@NotNull Message req, @NotNull Holder<ErrorSeverity> severityHolder) {
         return new Message.Builder()
                 .param("fseq", req.getBytes("fseq"))
@@ -232,7 +232,7 @@ public final class Client implements AutoCloseable {
         return null;
     }
 
-    @Nullable
+    @NotNull
     private Message.Builder clientCrypto(@NotNull Message req, @NotNull Holder<ErrorSeverity> severityHolder) {
         final byte[] confirm = req.getBytes("confirm");
         final String serverAddress = req.getString("serverAddress");
@@ -250,7 +250,7 @@ public final class Client implements AutoCloseable {
                 .param("token", result);
     }
 
-    @Nullable
+    @NotNull
     private Message.Builder clientPrompt(@NotNull Message req, @NotNull Holder<ErrorSeverity> severityHolder) throws IOException {
         final boolean truncate = req.getBytes("truncate") != null;
         final byte[] digest = req.getBytes("digest");

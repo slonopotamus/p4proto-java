@@ -152,10 +152,13 @@ public final class P4 {
                 System.out.println(message.getString("data"));
                 System.out.println("Hit return to continue...");
 
-                //noinspection StatementWithEmptyBody
-                while (System.in.read() != '\n') ;
-
-                return null;
+                while (true) {
+                    switch (System.in.read()) {
+                        case -1:
+                        case '\n':
+                            return null;
+                    }
+                }
 
             default:
                 throw new UnsupportedOperationException(message.getFunc());
@@ -185,7 +188,7 @@ public final class P4 {
         @Parameter(names = {"-h", "--help"}, description = "Show help", help = true)
         private boolean help = false;
 
-        public CmdArgs() throws UnknownHostException {
+        CmdArgs() throws UnknownHostException {
         }
     }
 }

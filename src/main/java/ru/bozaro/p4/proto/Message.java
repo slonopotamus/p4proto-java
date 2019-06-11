@@ -29,18 +29,43 @@ public final class Message {
     }
 
     @NotNull
-    public Message show(@NotNull PrintStream out, @NotNull String prefix) {
-        out.printf("===== MESSAGE BEGIN =====\n");
-        out.printf("%s Function: %s\n", prefix, getString(FUNC));
-        for (Map.Entry<String, byte[]> entry : params.entrySet()) {
-            if (entry.getKey().equals(FUNC)) continue;
-            out.printf("%s %s = %s\n", prefix, entry.getKey(), toString(entry.getValue()));
+    public static Message recv(@NotNull InputStream stream) throws IOException {
+        final Builder builder = new Builder();
+        int checksum = stream.read();
+        int length = read32(stream);
+        for (int i = 0; i < 4; ++i) {
+            checksum ^= 0xFF & (length >> (i << 3));
         }
-        for (String arg : args) {
-            out.printf("%s - %s\n", prefix, arg);
+        if (checksum != 0) throw new IOException("Checksum mismatch");
+
+        byte[] buf = new byte[length];
+        for (int position = 0; position < buf.length; ) {
+            int size = stream.read(buf, position, length - position);
+            if (size < 0) throw new IOException("Unexpected end of stream");
+            position += size;
         }
-        out.printf("===== MESSAGE END =====\n");
-        return this;
+
+        for (int position = 0; position < buf.length; ) {
+            int end = indexOf(buf, position, (byte) 0);
+            if (end < 0)
+                throw new IOException("Can't parse parameter name");
+            String name = new String(buf, position, end - position, StandardCharsets.UTF_8);
+            position = end + 1;
+
+            int len = read32(buf, position);
+            position += 4;
+
+            if (len + position + 1 > buf.length)
+                throw new IOException("Unexpected end of stream");
+            byte[] value = Arrays.copyOfRange(buf, position, position + len);
+            position += len;
+
+            if (buf[position] != 0)
+                throw new IOException("Can't parse parameter value");
+            position++;
+            builder.param(name, value);
+        }
+        return builder.build();
     }
 
     @NotNull
@@ -60,6 +85,7 @@ public final class Message {
         return (value != null) ? toString(value) : null;
     }
 
+    @Nullable
     public byte[] getBytes(@NotNull String key) {
         return params.get(key);
     }
@@ -79,11 +105,14 @@ public final class Message {
         return Collections.unmodifiableList(args);
     }
 
-    public Builder toBuilder() {
-        final Builder builder = new Builder();
-        builder.params.putAll(params);
-        builder.args.addAll(args);
-        return builder;
+    private static int read32(@NotNull InputStream stream) throws IOException {
+        int result = 0;
+        for (int i = 0; i < 4; ++i) {
+            int b = stream.read();
+            if (b < 0) throw new IOException("Unexpected end of stream");
+            result |= (0xFF & b) << (i << 3);
+        }
+        return result;
     }
 
     public static class Builder {
@@ -156,6 +185,7 @@ public final class Message {
         writer.write(0);
     }
 
+    @NotNull
     public byte[] serialize() throws IOException {
         ByteArrayOutputStream writer = new ByteArrayOutputStream(1024);
         writer.write(0);
@@ -197,44 +227,13 @@ public final class Message {
         stream.write(serialize());
     }
 
-    @NotNull
-    public static Message recv(InputStream stream) throws IOException {
-        final Builder builder = new Builder();
-        int checksum = stream.read();
-        int length = read32(stream);
+    private static int read32(@NotNull byte[] buf, int offset) throws IOException {
+        if (offset < 0 || offset > buf.length + 4) throw new IOException("Unexpected end of stream");
+        int result = 0;
         for (int i = 0; i < 4; ++i) {
-            checksum ^= 0xFF & (length >> (i << 3));
+            result |= (0xFF & (int) (buf[i + offset])) << (i << 3);
         }
-        if (checksum != 0) throw new IOException("Checksum mismatch");
-
-        byte[] buf = new byte[length];
-        for (int position = 0; position < buf.length; ) {
-            int size = stream.read(buf, position, length - position);
-            if (size < 0) throw new IOException("Unexpected end of stream");
-            position += size;
-        }
-
-        for (int position = 0; position < buf.length; ) {
-            int end = indexOf(buf, position, (byte) 0);
-            if (end < 0)
-                throw new IOException("Can't parse parameter name");
-            String name = new String(buf, position, end - position, StandardCharsets.UTF_8);
-            position = end + 1;
-
-            int len = read32(buf, position);
-            position += 4;
-
-            if (len + position + 1 > buf.length)
-                throw new IOException("Unexpected end of stream");
-            byte[] value = Arrays.copyOfRange(buf, position, position + len);
-            position += len;
-
-            if (buf[position] != 0)
-                throw new IOException("Can't parse parameter value");
-            position++;
-            builder.param(name, value);
-        }
-        return builder.build();
+        return result;
     }
 
     private static int indexOf(byte[] buf, int startPosition, byte b) {
@@ -244,22 +243,26 @@ public final class Message {
         return -1;
     }
 
-    private static int read32(InputStream stream) throws IOException {
-        int result = 0;
-        for (int i = 0; i < 4; ++i) {
-            int b = stream.read();
-            if (b < 0) throw new IOException("Unexpected end of stream");
-            result |= (0xFF & b) << (i << 3);
+    @NotNull
+    public Message show(@NotNull PrintStream out, @NotNull String prefix) {
+        out.print("===== MESSAGE BEGIN =====\n");
+        out.printf("%s Function: %s\n", prefix, getString(FUNC));
+        for (Map.Entry<String, byte[]> entry : params.entrySet()) {
+            if (entry.getKey().equals(FUNC)) continue;
+            out.printf("%s %s = %s\n", prefix, entry.getKey(), toString(entry.getValue()));
         }
-        return result;
+        for (String arg : args) {
+            out.printf("%s - %s\n", prefix, arg);
+        }
+        out.print("===== MESSAGE END =====\n");
+        return this;
     }
 
-    private static int read32(byte[] buf, int offset) throws IOException {
-        if (offset < 0 || offset > buf.length + 4) throw new IOException("Unexpected end of stream");
-        int result = 0;
-        for (int i = 0; i < 4; ++i) {
-            result |= (0xFF & (int) (buf[i + offset])) << (i << 3);
-        }
-        return result;
+    @NotNull
+    public Builder toBuilder() {
+        final Builder builder = new Builder();
+        builder.params.putAll(params);
+        builder.args.addAll(args);
+        return builder;
     }
 }
